@@ -1,0 +1,92 @@
+name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME in .env}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:?Set POSTGRES_HOST_PORT in .env}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+  
+  spark-master:
+    image: cdc-streamer-runtime:local
+    pull_policy: build
+    build:
+      context: .
+      target: spark-runtime
+      args:
+        SPARK_IMAGE: ${SPARK_IMAGE:?Set SPARK_IMAGE in .env}
+    environment:
+      SPARK_MASTER_HOST: ${SPARK_MASTER_HOST:?Set SPARK_MASTER_HOST in .env}
+    ports:
+      - "127.0.0.1:${SPARK_MASTER_UI_HOST_PORT:?Set SPARK_MASTER_UI_HOST_PORT in .env}:8080"
+      - "127.0.0.1:${SPARK_MASTER_HOST_PORT:?Set SPARK_MASTER_HOST_PORT in .env}:7077"
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+
+  spark-worker:
+    image: cdc-streamer-runtime:local
+    pull_policy: build
+    build:
+      context: .
+      target: spark-runtime
+      args:
+        SPARK_IMAGE: ${SPARK_IMAGE:?Set SPARK_IMAGE in .env}
+    depends_on:
+      - spark-master
+    environment:
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:?Set SPARK_WORKER_CORES in .env}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:?Set SPARK_WORKER_MEMORY in .env}
+    ports:
+      - "127.0.0.1:${SPARK_WORKER_UI_HOST_PORT:?Set SPARK_WORKER_UI_HOST_PORT in .env}:8081"
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker ${SPARK_MASTER_URL:?Set SPARK_MASTER_URL in .env}
+  
+  main:
+    image: cdc-streamer:local
+    pull_policy: build
+    build:
+      context: .
+      target: app
+      args:
+        SPARK_IMAGE: ${SPARK_IMAGE:?Set SPARK_IMAGE in .env}
+    profiles:
+      - app
+    depends_on:
+      - spark-master
+      - spark-worker
+      - postgres
+    command: ["cdc-streamer"]
+
+  jupyter:
+    image: cdc-streamer-notebook:local
+    pull_policy: build
+    build:
+      context: .
+      target: notebook
+      args:
+        SPARK_IMAGE: ${SPARK_IMAGE:?Set SPARK_IMAGE in .env}
+    depends_on:
+      - spark-master
+      - spark-worker
+    user: "0:0"
+    environment:
+      SPARK_MASTER_URL: ${SPARK_MASTER_URL:?Set SPARK_MASTER_URL in .env}
+      JUPYTER_UID: ${JUPYTER_UID:?Set JUPYTER_UID in .env}
+      JUPYTER_GID: ${JUPYTER_GID:?Set JUPYTER_GID in .env}
+    ports:
+      - "127.0.0.1:${JUPYTER_HOST_PORT:?Set JUPYTER_HOST_PORT in .env}:8888"
+    volumes:
+      - ./notebooks:/opt/cdc-streamer/notebooks
+
+secrets:
+  postgres_password:
+    file: ${POSTGRES_SECRET_FILE:?Set POSTGRES_SECRET_FILE in .env}
+
+volumes:
+  postgres-data:

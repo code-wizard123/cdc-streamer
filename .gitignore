@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local Compose configuration and credentials
+.env
+secrets/*
+!secrets/.gitkeep
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+.Trash-*

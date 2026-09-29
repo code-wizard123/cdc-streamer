@@ -1,0 +1,21 @@
+[project]
+name = "cdc-streamer"
+version = "0.1.0"
+description = "The following project is a CDC (Change Data Capture) streamer that captures changes from a source database and streams them to a target system in real-time. It supports various databases and streaming platforms, providing a flexible and efficient solution for data replication and synchronization."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+notebook = ["ipykernel==6.30.1", "jupyterlab==4.4.7"]
+
+[project.scripts]
+cdc-streamer = "cdc_streamer.cli:entrypoint"
+cdc-streamer-example = "cdc_streamer.cli:example"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cdc_streamer"]
